@@ -1,0 +1,20 @@
+[project]
+name = "ghm"
+version = "0.1.0"
+description = "CLI tool to manage GitHub organization repository settings"
+authors = [
+    { name = "Connor Adams", email = "connorads@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "pygithub>=2.8.1",
+    "rich>=13.0",
+    "typer>=0.20.0",
+]
+
+[project.scripts]
+ghm = "ghm.main:app"
+
+[build-system]
+requires = ["uv_build>=0.9.17,<0.10.0"]
+build-backend = "uv_build"
