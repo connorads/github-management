@@ -230,7 +230,7 @@ OR
 ✗ acme-uk/backbone: Failed - 404 {"message": "Not Found", ...}
 ```
 
-**Note on 404s**: GitHub's API often returns `404 Not Found` instead of `403 Forbidden` if your token lacks the necessary write scopes or if you don't have administrative access to the repository.
+**Note on 404s**: GitHub's REST API is often stricter than the Web UI. Even if you can change these settings in your browser, the API may still return a `404 Not Found` (or `403 Forbidden`) if you do not have the **Admin** role on the repository. The **Maintainer** role is often sufficient for the Web UI but insufficient for the REST API's repository update endpoint.
 
 **Solution**: Ensure your token has `repo` or `write:org` scope and that you have Admin/Maintainer permissions. With `gh` CLI:
 
