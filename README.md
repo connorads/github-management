@@ -4,7 +4,8 @@ A Python CLI tool to manage GitHub organization repository settings, with a focu
 
 ## Features
 
-- **Bulk repository management**: Update merge/squash settings across entire GitHub organizations
+- **Flexible targeting**: Manage entire organizations, specific users, or individual repositories (`owner/repo`)
+- **Bulk repository management**: Update merge/squash settings across multiple repositories at once
 - **Smart authentication**: Automatically uses `gh` CLI token, with fallback to `GITHUB_TOKEN` env var
 - **Safe by default**: Dry-run mode shows what would change before applying updates
 - **Progress tracking**: Real-time progress bars for long-running operations
@@ -54,16 +55,22 @@ gh auth login
 
 ### List Repository Settings
 
-Get a summary of merge settings across your org:
+Get a summary of merge settings across your target (organization, user, or single repository):
 
 ```bash
-# Summary view (default)
+# Target an organization
 uv run ghm repos list acme-uk
+
+# Target a user
+uv run ghm repos list octocat
+
+# Target a single repository
+uv run ghm repos list acme-uk/backbone
 
 # Verbose table view
 uv run ghm repos list acme-uk --verbose
 
-# Include archived and forked repos
+# Include archived and forked repos (for orgs/users)
 uv run ghm repos list acme-uk --include-archived --include-forks
 ```
 
@@ -152,18 +159,15 @@ uv run ghm repos list acme-uk --include-archived --include-forks
 
 ## Common Workflows
 
-### Standardize squash merge across org
+### Standardize squash merge across org or repo
 
-**Use case**: You want all repos to use PR title + description for squash merges (instead of commit messages).
+**Use case**: You want all repos (or a specific one) to use PR title + description for squash merges.
 
 ```bash
-# 1. Check current state
-uv run ghm repos list acme-uk
+# Preview changes for a single repo
+uv run ghm repos fix-squash acme-uk/backbone
 
-# 2. Preview changes
-uv run ghm repos fix-squash acme-uk
-
-# 3. Apply changes
+# Apply changes to an entire org
 uv run ghm repos fix-squash acme-uk --apply
 ```
 
@@ -214,17 +218,27 @@ Error: No GitHub token found. Please either:
 
 **Solution**: Run `gh auth login` or set `GITHUB_TOKEN` environment variable.
 
-### Permission denied
+### Permission denied (403 or 404)
 
 ```
 Error: 403 Resource not accessible by personal access token
 ```
 
-**Solution**: Your token needs `repo` scope. With `gh` CLI:
+OR
+
+```
+✗ acme-uk/backbone: Failed - 404 {"message": "Not Found", ...}
+```
+
+**Note on 404s**: GitHub's API often returns `404 Not Found` instead of `403 Forbidden` if your token lacks the necessary write scopes or if you don't have administrative access to the repository.
+
+**Solution**: Ensure your token has `repo` or `write:org` scope and that you have Admin/Maintainer permissions. With `gh` CLI:
 
 ```bash
 gh auth refresh -s repo
 ```
+
+If the organization requires SAML SSO, ensure your token is authorized for that organization.
 
 ### Command takes too long
 

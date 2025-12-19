@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-from github import Github, Repository
+from github import Github, Repository, Organization, NamedUser
 from rich.console import Console
 from rich.progress import (
     Progress,
@@ -70,37 +70,47 @@ class RepoSettings:
         return self.merge_commit_title != title or self.merge_commit_message != message
 
 
-def list_org_repos(
+def get_target_repos(
     github_client: Github,
-    org_name: str,
+    target: str,
     include_archived: bool = False,
     include_forks: bool = False,
 ) -> List[RepoSettings]:
     """
-    List all repositories in an organization with their merge settings.
+    Get repository settings for a target (repo, org, or user).
 
     Args:
         github_client: Authenticated GitHub client
-        org_name: Organization name
+        target: Target identifier (e.g., 'org', 'user', or 'owner/repo')
         include_archived: Include archived repositories
         include_forks: Include forked repositories
 
     Returns:
         List of RepoSettings objects
     """
-    repos_settings = []
+    # Check if target is a single repository
+    if "/" in target:
+        console.print(f"[dim]Fetching single repository {target}...[/dim]")
+        repo = github_client.get_repo(target)
+        return [RepoSettings.from_repo(repo)]
+
+    # Otherwise, treat as an organization or user
+    try:
+        # Try organization first
+        owner = github_client.get_organization(target)
+        console.print(f"[dim]Fetching repositories from organization {target}...[/dim]")
+    except Exception:
+        # Fallback to user
+        owner = github_client.get_user(target)
+        console.print(f"[dim]Fetching repositories from user {target}...[/dim]")
+
+    all_repos = list(owner.get_repos())
+    console.print(f"[dim]Found {len(all_repos)} total repositories[/dim]")
+
+    filtered_repos = []
     skipped_archived = 0
     skipped_forks = 0
 
-    org = github_client.get_organization(org_name)
-
-    # Get basic repo list first (fast)
-    console.print(f"[dim]Fetching repository list from {org_name}...[/dim]")
-    all_repos = list(org.get_repos())
-    console.print(f"[dim]Found {len(all_repos)} total repositories[/dim]")
-
-    # Filter repos before fetching expensive merge settings
-    repos_to_fetch = []
     for repo in all_repos:
         if not include_archived and repo.archived:
             skipped_archived += 1
@@ -108,16 +118,27 @@ def list_org_repos(
         if not include_forks and repo.fork:
             skipped_forks += 1
             continue
-        repos_to_fetch.append(repo)
+        filtered_repos.append(repo)
 
-    # Report filtering results
     if skipped_archived > 0:
         console.print(f"[dim]Skipping {skipped_archived} archived repositories[/dim]")
     if skipped_forks > 0:
         console.print(f"[dim]Skipping {skipped_forks} forked repositories[/dim]")
 
-    # Now fetch detailed merge settings with progress bar
-    # Note: PyGithub makes an API call per repo for merge settings
+    # Fetch detailed settings
+    return fetch_repos_settings(filtered_repos)
+
+
+def fetch_repos_settings(repos: List[Repository.Repository]) -> List[RepoSettings]:
+    """Fetch detailed merge settings for a list of repositories."""
+    if not repos:
+        return []
+
+    # Skip progress bar for single repo
+    if len(repos) == 1:
+        return [RepoSettings.from_repo(repos[0])]
+
+    repos_settings = []
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -125,11 +146,9 @@ def list_org_repos(
         TaskProgressColumn(),
         console=console,
     ) as progress:
-        task = progress.add_task(
-            "Fetching merge settings...", total=len(repos_to_fetch)
-        )
+        task = progress.add_task("Fetching merge settings...", total=len(repos))
 
-        for repo in repos_to_fetch:
+        for repo in repos:
             settings = RepoSettings.from_repo(repo)
             repos_settings.append(settings)
             progress.update(task, advance=1)
@@ -312,7 +331,12 @@ def update_repo_settings(
         console.print(f"[green]✓ {repo_full_name}: Updated successfully[/green]")
         return True
     except Exception as e:
-        console.print(f"[red]✗ {repo_full_name}: Failed - {e}[/red]")
+        error_msg = str(e)
+        if "404" in error_msg:
+            error_msg = (
+                "404 Not Found (Check permissions or if target is an organization)"
+            )
+        console.print(f"[red]✗ {repo_full_name}: Failed - {error_msg}[/red]")
         return False
 
 

@@ -9,7 +9,7 @@ from ghm.auth import create_github_client
 from ghm.repos import (
     bulk_update_repos,
     display_repos_table,
-    list_org_repos,
+    get_target_repos,
 )
 
 app = typer.Typer(
@@ -29,7 +29,9 @@ console = Console()
 
 @repos_app.command("list")
 def list_repos(
-    org: str = typer.Argument(..., help="Organization name"),
+    target: str = typer.Argument(
+        ..., help="Target (organization, user, or owner/repo)"
+    ),
     include_archived: bool = typer.Option(
         False, "--include-archived", help="Include archived repositories"
     ),
@@ -43,12 +45,12 @@ def list_repos(
         None, "--token", help="GitHub token (defaults to gh CLI or GITHUB_TOKEN env)"
     ),
 ):
-    """List all repositories in an organization with their merge settings."""
+    """List repositories and their merge settings."""
     try:
         github_client = create_github_client(token=token)
-        repos = list_org_repos(
+        repos = get_target_repos(
             github_client,
-            org,
+            target,
             include_archived=include_archived,
             include_forks=include_forks,
         )
@@ -64,7 +66,9 @@ def list_repos(
 
 @repos_app.command("update-merge")
 def update_merge_settings(
-    org: str = typer.Argument(..., help="Organization name"),
+    target: str = typer.Argument(
+        ..., help="Target (organization, user, or owner/repo)"
+    ),
     squash_title: Optional[str] = typer.Option(
         None,
         "--squash-title",
@@ -99,7 +103,7 @@ def update_merge_settings(
     ),
 ):
     """
-    Update merge commit settings for all repositories in an organization.
+    Update merge commit settings for repositories.
 
     Common patterns:
       - Squash to PR title + body: --squash-title PR_TITLE --squash-message PR_BODY
@@ -115,7 +119,7 @@ def update_merge_settings(
     try:
         github_client = create_github_client(token=token)
 
-        console.print(f"[bold]Organization:[/bold] {org}")
+        console.print(f"[bold]Target:[/bold] {target}")
         if dry_run:
             console.print(
                 "[yellow]Mode: DRY RUN (use --apply to make changes)[/yellow]\n"
@@ -123,9 +127,9 @@ def update_merge_settings(
         else:
             console.print("[red]Mode: APPLY (making real changes)[/red]\n")
 
-        repos = list_org_repos(
+        repos = get_target_repos(
             github_client,
-            org,
+            target,
             include_archived=include_archived,
             include_forks=include_forks,
         )
@@ -161,7 +165,9 @@ def update_merge_settings(
 
 @repos_app.command("fix-squash")
 def fix_squash_defaults(
-    org: str = typer.Argument(..., help="Organization name"),
+    target: str = typer.Argument(
+        ..., help="Target (organization, user, or owner/repo)"
+    ),
     include_archived: bool = typer.Option(
         False, "--include-archived", help="Include archived repositories"
     ),
@@ -179,12 +185,12 @@ def fix_squash_defaults(
     Quick fix: Set squash merge to use PR title + body (most common use case).
 
     This is a convenience command equivalent to:
-      ghm repos update-merge ORG --squash-title PR_TITLE --squash-message PR_BODY
+      ghm repos update-merge TARGET --squash-title PR_TITLE --squash-message PR_BODY
     """
     try:
         github_client = create_github_client(token=token)
 
-        console.print(f"[bold]Organization:[/bold] {org}")
+        console.print(f"[bold]Target:[/bold] {target}")
         console.print("[bold]Action:[/bold] Set squash merge to PR_TITLE + PR_BODY\n")
         if dry_run:
             console.print(
@@ -193,9 +199,9 @@ def fix_squash_defaults(
         else:
             console.print("[red]Mode: APPLY (making real changes)[/red]\n")
 
-        repos = list_org_repos(
+        repos = get_target_repos(
             github_client,
-            org,
+            target,
             include_archived=include_archived,
             include_forks=include_forks,
         )
